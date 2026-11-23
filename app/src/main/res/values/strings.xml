@@ -36,6 +36,8 @@
     <string name="menu_todos">待办事项</string>
     <string name="menu_add_todo">新建待办</string>
     <string name="menu_all_notes">全部笔记</string>
+    <string name="menu_pin">置顶</string>
+    <string name="menu_unpin">取消置顶</string>
 
     <string name="button_ok">确定</string>
     <string name="text_title">标题：</string>
@@ -50,6 +52,7 @@
     <string name="category_all">全部分类</string>
     <string name="category_label">分类</string>
     <string name="background_color_label">背景色</string>
+    <string name="font_label">字体</string>
     <string name="checkbox_is_todo">设为待办事项</string>
     <string name="checkbox_todo_done">已完成</string>
     <string name="empty_notes">暂无笔记，点击“新建笔记”开始记录</string>
@@ -58,6 +61,7 @@
     <string name="note_preview_empty">暂无正文内容</string>
     <string name="note_time_format">修改于 %1$s</string>
     <string name="note_meta_format">%1$s  %2$s</string>
+    <string name="note_pinned_label">置顶</string>
     <string-array name="note_sort_options">
         <item>最近修改</item>
         <item>最新创建</item>
@@ -73,6 +77,30 @@
     <string name="todo_marked_pending">已标记为未完成</string>
     <string name="context_mark_done">标记完成</string>
     <string name="context_mark_pending">标记未完成</string>
+    <string name="todo_priority_label">优先级</string>
+    <string name="todo_due_date_label">截止日期</string>
+    <string name="todo_no_due_date">未设置截止日期</string>
+    <string name="todo_clear_due_date">清除截止日期</string>
+    <string name="clear_label">清除</string>
+    <string name="todo_due_date_format">截止 %1$s</string>
+    <string name="todo_overdue_format">已逾期 · 截止 %1$s</string>
+    <string name="todo_summary_format">待完成 %1$d  /  已完成 %2$d</string>
+    <string name="todo_priority_normal">普通</string>
+    <string name="todo_priority_important">重要</string>
+    <string name="todo_priority_urgent">紧急</string>
+
+    <string-array name="note_font_options">
+        <item>系统默认</item>
+        <item>宋体风格</item>
+        <item>黑体风格</item>
+        <item>等宽字体</item>
+    </string-array>
+
+    <string-array name="todo_priority_options">
+        <item>普通</item>
+        <item>重要</item>
+        <item>紧急</item>
+    </string-array>
 
     <string-array name="note_categories">
         <item>未分类</item>

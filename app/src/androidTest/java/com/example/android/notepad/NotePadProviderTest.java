@@ -177,7 +177,12 @@ public class NotePadProviderTest extends ProviderTestCase2<NotePadProvider> {
         assertEquals(NotePad.Notes.CONTENT_ITEM_TYPE, mimeType);
 
         // Tests an invalid URI. This should throw an IllegalArgumentException.
-        mimeType = mMockResolver.getType(INVALID_URI);
+        try {
+            mMockResolver.getType(INVALID_URI);
+            fail("Expected IllegalArgumentException for an invalid URI");
+        } catch (IllegalArgumentException expected) {
+            // Expected behavior.
+        }
     }
 
     /*
@@ -209,8 +214,8 @@ public class NotePadProviderTest extends ProviderTestCase2<NotePadProvider> {
         // Tests that the result is not null and is equal to the expected value. Also tests that
         // only one MIME type is returned.
         assertNotNull(mimeType);
-        assertEquals(mimeType[0],"text/plain");
-        assertEquals(mimeType.length,1);
+        assertEquals("text/plain", mimeType[0]);
+        assertEquals(1, mimeType.length);
 
         /*
          * Tests with the same URI but with a filter that should not return any URIs.
@@ -610,6 +615,84 @@ public class NotePadProviderTest extends ProviderTestCase2<NotePadProvider> {
 
       // Asserts that the note ID passed to the provider is the same as the note ID returned.
       assertEquals(inputNoteId, cursor.getInt(0));
+    }
+
+    /**
+     * Verifies that provider inserts fill the defaults introduced by versions 3-6.
+     */
+    public void testExtendedColumnDefaults() {
+        ContentValues values = new ContentValues();
+        values.put(NotePad.Notes.COLUMN_NAME_TITLE, "Defaults");
+        values.put(NotePad.Notes.COLUMN_NAME_NOTE, "Default values");
+
+        Uri noteUri = mMockResolver.insert(NotePad.Notes.CONTENT_URI, values);
+        Cursor cursor = mMockResolver.query(noteUri, null, null, null, null);
+
+        assertNotNull(cursor);
+        assertTrue(cursor.moveToFirst());
+        assertEquals(
+                NotePad.Notes.DEFAULT_CATEGORY,
+                cursor.getString(cursor.getColumnIndexOrThrow(
+                        NotePad.Notes.COLUMN_NAME_CATEGORY)));
+        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_IS_TODO)));
+        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_TODO_DONE)));
+        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR)));
+        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_IS_PINNED)));
+        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_TODO_PRIORITY)));
+        assertEquals(0, cursor.getLong(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE)));
+        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_FONT_STYLE)));
+        cursor.close();
+    }
+
+    /**
+     * Verifies title/content search and pinned-first ordering at the provider level.
+     */
+    public void testSearchAndPinnedOrdering() {
+        ContentValues pinned = new ContentValues();
+        pinned.put(NotePad.Notes.COLUMN_NAME_TITLE, "Pinned note");
+        pinned.put(NotePad.Notes.COLUMN_NAME_NOTE, "ordinary body");
+        pinned.put(NotePad.Notes.COLUMN_NAME_IS_PINNED, 1);
+        pinned.put(
+                NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
+                START_DATE + 1000);
+        mMockResolver.insert(NotePad.Notes.CONTENT_URI, pinned);
+
+        ContentValues searchable = new ContentValues();
+        searchable.put(NotePad.Notes.COLUMN_NAME_TITLE, "Another note");
+        searchable.put(NotePad.Notes.COLUMN_NAME_NOTE, "contains needle");
+        searchable.put(
+                NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
+                START_DATE + 2000);
+        mMockResolver.insert(NotePad.Notes.CONTENT_URI, searchable);
+
+        String selection = "("
+                + NotePad.Notes.COLUMN_NAME_TITLE + " LIKE ? OR "
+                + NotePad.Notes.COLUMN_NAME_NOTE + " LIKE ?)";
+        Cursor cursor = mMockResolver.query(
+                NotePad.Notes.CONTENT_URI,
+                new String[] {
+                        NotePad.Notes._ID,
+                        NotePad.Notes.COLUMN_NAME_TITLE,
+                        NotePad.Notes.COLUMN_NAME_IS_PINNED
+                },
+                selection,
+                new String[] { "%pinned%", "%needle%" },
+                NotePad.Notes.COLUMN_NAME_IS_PINNED + " DESC, "
+                        + NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " DESC");
+
+        assertNotNull(cursor);
+        assertEquals(2, cursor.getCount());
+        assertTrue(cursor.moveToFirst());
+        assertEquals("Pinned note", cursor.getString(1));
+        assertEquals(1, cursor.getInt(2));
+        cursor.close();
     }
 
     /*

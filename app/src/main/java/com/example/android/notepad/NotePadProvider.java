@@ -63,7 +63,7 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
     /**
      * The database version
      */
-    private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 6;
 
     /**
      * A projection map used to select columns from the database
@@ -164,6 +164,22 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
                 NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR,
                 NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR);
 
+        sNotesProjectionMap.put(
+                NotePad.Notes.COLUMN_NAME_IS_PINNED,
+                NotePad.Notes.COLUMN_NAME_IS_PINNED);
+
+        sNotesProjectionMap.put(
+                NotePad.Notes.COLUMN_NAME_TODO_PRIORITY,
+                NotePad.Notes.COLUMN_NAME_TODO_PRIORITY);
+
+        sNotesProjectionMap.put(
+                NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE,
+                NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE);
+
+        sNotesProjectionMap.put(
+                NotePad.Notes.COLUMN_NAME_FONT_STYLE,
+                NotePad.Notes.COLUMN_NAME_FONT_STYLE);
+
         // Maps "created" to "created"
         sNotesProjectionMap.put(NotePad.Notes.COLUMN_NAME_CREATE_DATE,
                 NotePad.Notes.COLUMN_NAME_CREATE_DATE);
@@ -218,6 +234,14 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
                    + NotePad.Notes.COLUMN_NAME_TODO_DONE + " INTEGER NOT NULL DEFAULT 0,"
                    + NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR
                    + " INTEGER NOT NULL DEFAULT 0,"
+                   + NotePad.Notes.COLUMN_NAME_IS_PINNED
+                   + " INTEGER NOT NULL DEFAULT 0,"
+                   + NotePad.Notes.COLUMN_NAME_TODO_PRIORITY
+                   + " INTEGER NOT NULL DEFAULT 0,"
+                   + NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE
+                   + " INTEGER NOT NULL DEFAULT 0,"
+                   + NotePad.Notes.COLUMN_NAME_FONT_STYLE
+                   + " INTEGER NOT NULL DEFAULT 0,"
                    + NotePad.Notes.COLUMN_NAME_CREATE_DATE + " INTEGER,"
                    + NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " INTEGER"
                    + ");");
@@ -250,6 +274,20 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
            if (oldVersion < 5) {
                db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME
                        + " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR
+                       + " INTEGER NOT NULL DEFAULT 0");
+           }
+           if (oldVersion < 6) {
+               db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME
+                       + " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_IS_PINNED
+                       + " INTEGER NOT NULL DEFAULT 0");
+               db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME
+                       + " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_TODO_PRIORITY
+                       + " INTEGER NOT NULL DEFAULT 0");
+               db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME
+                       + " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE
+                       + " INTEGER NOT NULL DEFAULT 0");
+               db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME
+                       + " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_FONT_STYLE
                        + " INTEGER NOT NULL DEFAULT 0");
            }
        }
@@ -586,6 +624,18 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
         }
         if (values.containsKey(NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR) == false) {
             values.put(NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR, 0);
+        }
+        if (values.containsKey(NotePad.Notes.COLUMN_NAME_IS_PINNED) == false) {
+            values.put(NotePad.Notes.COLUMN_NAME_IS_PINNED, 0);
+        }
+        if (values.containsKey(NotePad.Notes.COLUMN_NAME_TODO_PRIORITY) == false) {
+            values.put(NotePad.Notes.COLUMN_NAME_TODO_PRIORITY, 0);
+        }
+        if (values.containsKey(NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE) == false) {
+            values.put(NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE, 0);
+        }
+        if (values.containsKey(NotePad.Notes.COLUMN_NAME_FONT_STYLE) == false) {
+            values.put(NotePad.Notes.COLUMN_NAME_FONT_STYLE, 0);
         }
 
         // Opens the database object in "write" mode.

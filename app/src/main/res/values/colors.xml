@@ -7,6 +7,7 @@
     <color name="accent">#2F6FED</color>
     <color name="accent_soft">#E8F0FF</color>
     <color name="divider">#E2E7ED</color>
+    <color name="danger">#C62828</color>
     <color name="note_color_white">#FFFFFF</color>
     <color name="note_color_yellow">#FFF4CC</color>
     <color name="note_color_blue">#E7F0FF</color>

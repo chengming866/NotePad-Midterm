@@ -22,6 +22,7 @@ import android.app.ListActivity;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
@@ -50,7 +51,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 
 /**
@@ -80,6 +80,9 @@ public class NotesList extends ListActivity {
             NotePad.Notes.COLUMN_NAME_IS_TODO, // 5
             NotePad.Notes.COLUMN_NAME_TODO_DONE, // 6
             NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR, // 7
+            NotePad.Notes.COLUMN_NAME_IS_PINNED, // 8
+            NotePad.Notes.COLUMN_NAME_TODO_PRIORITY, // 9
+            NotePad.Notes.COLUMN_NAME_FONT_STYLE, // 10
     };
 
     /** The index of the title column */
@@ -286,20 +289,27 @@ public class NotesList extends ListActivity {
     }
 
     private String selectedSortOrder() {
+        String order;
         switch (mSortOrder.getSelectedItemPosition()) {
             case 1:
-                return NotePad.Notes.COLUMN_NAME_CREATE_DATE + " DESC";
+                order = NotePad.Notes.COLUMN_NAME_CREATE_DATE + " DESC";
+                break;
             case 2:
-                return NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE ASC";
+                order = NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE ASC";
+                break;
             case 3:
-                return NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE DESC";
+                order = NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE DESC";
+                break;
             case 4:
-                return NotePad.Notes.COLUMN_NAME_CATEGORY + " ASC, "
+                order = NotePad.Notes.COLUMN_NAME_CATEGORY + " ASC, "
                         + NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " DESC";
+                break;
             case 0:
             default:
-                return NotePad.Notes.DEFAULT_SORT_ORDER;
+                order = NotePad.Notes.DEFAULT_SORT_ORDER;
+                break;
         }
+        return NotePad.Notes.COLUMN_NAME_IS_PINNED + " DESC, " + order;
     }
 
     private void refreshNotes() {
@@ -336,6 +346,10 @@ public class NotesList extends ListActivity {
 
             if (view.getId() == R.id.note_title) {
                 String title = cursor.getString(columnIndex);
+                NoteFontUtils.applyBold(
+                        (TextView) view,
+                        cursor.getInt(cursor.getColumnIndexOrThrow(
+                                NotePad.Notes.COLUMN_NAME_FONT_STYLE)));
                 ((TextView) view).setText(TextUtils.isEmpty(title)
                         ? getString(R.string.note_untitled)
                         : title);
@@ -344,6 +358,10 @@ public class NotesList extends ListActivity {
 
             if (view.getId() == R.id.note_preview) {
                 String note = cursor.getString(columnIndex);
+                NoteFontUtils.apply(
+                        (TextView) view,
+                        cursor.getInt(cursor.getColumnIndexOrThrow(
+                                NotePad.Notes.COLUMN_NAME_FONT_STYLE)));
                 String preview = note == null ? "" : note.replace('\n', ' ').trim();
                 if (preview.length() > 80) {
                     preview = preview.substring(0, 80) + "...";
@@ -358,24 +376,41 @@ public class NotesList extends ListActivity {
                 long modified = cursor.getLong(columnIndex);
                 String category = NoteDataUtils.normalizeCategory(cursor.getString(
                         cursor.getColumnIndexOrThrow(NotePad.Notes.COLUMN_NAME_CATEGORY)));
-                String categoryLabel = category;
+                List<String> labels = new ArrayList<String>();
+                if (cursor.getInt(cursor.getColumnIndexOrThrow(
+                        NotePad.Notes.COLUMN_NAME_IS_PINNED)) == 1) {
+                    labels.add(getString(R.string.note_pinned_label));
+                }
                 if (cursor.getInt(cursor.getColumnIndexOrThrow(
                         NotePad.Notes.COLUMN_NAME_IS_TODO)) == 1) {
                     String todoStatus = getString(cursor.getInt(cursor.getColumnIndexOrThrow(
                             NotePad.Notes.COLUMN_NAME_TODO_DONE)) == 1
                             ? R.string.todo_completed
                             : R.string.todo_pending);
-                    categoryLabel = todoStatus + "  " + category;
+                    labels.add(todoStatus);
+                    int priority = cursor.getInt(cursor.getColumnIndexOrThrow(
+                            NotePad.Notes.COLUMN_NAME_TODO_PRIORITY));
+                    if (priority > 0) {
+                        labels.add(getString(priority == 2
+                                ? R.string.todo_priority_urgent
+                                : R.string.todo_priority_important));
+                    }
                 }
-                SimpleDateFormat formatter = new SimpleDateFormat(
-                        "yyyy-MM-dd HH:mm",
-                        Locale.getDefault());
+                labels.add(category);
+                StringBuilder labelBuilder = new StringBuilder();
+                for (int i = 0; i < labels.size(); i++) {
+                    if (i > 0) {
+                        labelBuilder.append(" · ");
+                    }
+                    labelBuilder.append(labels.get(i));
+                }
+                SimpleDateFormat formatter = NoteDateUtils.formatter("yyyy-MM-dd HH:mm");
                 String time = getString(
                         R.string.note_time_format,
                         formatter.format(new Date(modified)));
                 ((TextView) view).setText(getString(
                         R.string.note_meta_format,
-                        categoryLabel,
+                        labelBuilder.toString(),
                         time));
                 return true;
             }
@@ -588,6 +623,10 @@ public class NotesList extends ListActivity {
 
         // Sets the menu header to be the title of the selected note.
         menu.setHeaderTitle(cursor.getString(COLUMN_INDEX_TITLE));
+        boolean pinned = cursor.getInt(cursor.getColumnIndexOrThrow(
+                NotePad.Notes.COLUMN_NAME_IS_PINNED)) == 1;
+        menu.findItem(R.id.context_pin).setTitle(
+                pinned ? R.string.menu_unpin : R.string.menu_pin);
 
         // Append to the
         // menu items for any other activities that can do stuff with it
@@ -651,6 +690,17 @@ public class NotesList extends ListActivity {
             // Launch activity to view/edit the currently selected item
             startActivity(new Intent(Intent.ACTION_EDIT, noteUri)
                     .setClass(this, NoteEditor.class));
+            return true;
+        } else if (id == R.id.context_pin) {
+            Cursor cursor = (Cursor) getListAdapter().getItem(info.position);
+            if (cursor != null) {
+                boolean pinned = cursor.getInt(cursor.getColumnIndexOrThrow(
+                        NotePad.Notes.COLUMN_NAME_IS_PINNED)) == 1;
+                ContentValues values = new ContentValues();
+                values.put(NotePad.Notes.COLUMN_NAME_IS_PINNED, pinned ? 0 : 1);
+                getContentResolver().update(noteUri, values, null, null);
+                refreshNotes();
+            }
             return true;
         } else if (id == R.id.context_copy) { //BEGIN_INCLUDE(copy)
             // Gets a handle to the clipboard service.

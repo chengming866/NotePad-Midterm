@@ -19,6 +19,7 @@ package com.example.android.notepad;
 import static com.example.android.notepad.R.*;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
@@ -41,8 +42,14 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.TextView;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 
 /**
  * This Activity handles "editing" a note, where editing is responding to
@@ -76,7 +83,10 @@ public class NoteEditor extends Activity {
             NotePad.Notes.COLUMN_NAME_CATEGORY,
             NotePad.Notes.COLUMN_NAME_IS_TODO,
             NotePad.Notes.COLUMN_NAME_TODO_DONE,
-            NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR
+            NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR,
+            NotePad.Notes.COLUMN_NAME_TODO_PRIORITY,
+            NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE,
+            NotePad.Notes.COLUMN_NAME_FONT_STYLE
     };
 
     // A label for the saved state of the activity
@@ -88,6 +98,10 @@ public class NoteEditor extends Activity {
     private static final String ORIGINAL_BACKGROUND_COLOR = "origBackgroundColor";
     private static final String ORIGINAL_BACKGROUND_COLOR_SET =
             "origBackgroundColorSet";
+    private static final String ORIGINAL_TODO_PRIORITY = "origTodoPriority";
+    private static final String ORIGINAL_TODO_DUE_DATE = "origTodoDueDate";
+    private static final String ORIGINAL_FONT_STYLE = "origFontStyle";
+    private static final String ORIGINAL_TODO_META_SET = "origTodoMetaSet";
 
     // This Activity can be started by more than one action. Each action is represented
     // as a "state" constant
@@ -102,8 +116,14 @@ public class NoteEditor extends Activity {
     private Spinner mCategory;
     private CheckBox mIsTodo;
     private CheckBox mTodoDone;
+    private View mTodoSettings;
+    private Spinner mPriority;
+    private Spinner mFont;
+    private TextView mDueDate;
+    private TextView mClearDueDate;
     private View[] mColorSwatches;
     private int mSelectedColorIndex;
+    private long mSelectedDueDate;
     private String mOriginalContent;
     private String mOriginalCategory;
     private boolean mOriginalIsTodo;
@@ -111,6 +131,10 @@ public class NoteEditor extends Activity {
     private boolean mOriginalTodoSet;
     private int mOriginalColorIndex;
     private boolean mOriginalColorSet;
+    private int mOriginalPriority;
+    private long mOriginalDueDate;
+    private int mOriginalFontStyle;
+    private boolean mOriginalTodoMetaSet;
 
     /**
      * Defines a custom EditText View that draws lines between each line of text that is displayed.
@@ -273,12 +297,33 @@ public class NoteEditor extends Activity {
         mCategory = (Spinner) findViewById(R.id.note_category);
         mIsTodo = (CheckBox) findViewById(R.id.note_is_todo);
         mTodoDone = (CheckBox) findViewById(R.id.note_todo_done);
+        mTodoSettings = findViewById(R.id.todo_settings);
+        mPriority = (Spinner) findViewById(R.id.todo_priority);
+        mFont = (Spinner) findViewById(R.id.note_font);
+        mDueDate = (TextView) findViewById(R.id.todo_due_date);
+        mClearDueDate = (TextView) findViewById(R.id.todo_clear_due_date);
         setupColorSwatches();
+        setupFontSelector();
+
+        mDueDate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showDueDatePicker();
+            }
+        });
+        mClearDueDate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mSelectedDueDate = 0;
+                updateDueDateLabel();
+            }
+        });
 
         mIsTodo.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 mTodoDone.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+                mTodoSettings.setVisibility(isChecked ? View.VISIBLE : View.GONE);
                 if (!isChecked) {
                     mTodoDone.setChecked(false);
                 }
@@ -300,6 +345,17 @@ public class NoteEditor extends Activity {
                     0);
             mOriginalColorSet = savedInstanceState.getBoolean(
                     ORIGINAL_BACKGROUND_COLOR_SET);
+            mOriginalPriority = savedInstanceState.getInt(
+                    ORIGINAL_TODO_PRIORITY,
+                    0);
+            mOriginalDueDate = savedInstanceState.getLong(
+                    ORIGINAL_TODO_DUE_DATE,
+                    0);
+            mOriginalFontStyle = savedInstanceState.getInt(
+                    ORIGINAL_FONT_STYLE,
+                    0);
+            mOriginalTodoMetaSet = savedInstanceState.getBoolean(
+                    ORIGINAL_TODO_META_SET);
         }
     }
 
@@ -340,6 +396,62 @@ public class NoteEditor extends Activity {
                     i == mSelectedColorIndex);
         }
         NoteColorUtils.applyCardBackground(mText, this, mSelectedColorIndex);
+    }
+
+    private void setupFontSelector() {
+        mFont.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(
+                    android.widget.AdapterView<?> parent,
+                    View view,
+                    int position,
+                    long id) {
+                NoteFontUtils.apply(mText, position);
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                NoteFontUtils.apply(mText, 0);
+            }
+        });
+    }
+
+    private void showDueDatePicker() {
+        Calendar initial = NoteDateUtils.calendar();
+        if (mSelectedDueDate > 0) {
+            initial.setTimeInMillis(mSelectedDueDate);
+        }
+        DatePickerDialog dialog = new DatePickerDialog(
+                this,
+                new DatePickerDialog.OnDateSetListener() {
+                    @Override
+                    public void onDateSet(
+                            DatePicker view,
+                            int year,
+                            int month,
+                            int dayOfMonth) {
+                        Calendar dueDate = NoteDateUtils.calendar();
+                        dueDate.set(year, month, dayOfMonth, 23, 59, 59);
+                        dueDate.set(Calendar.MILLISECOND, 999);
+                        mSelectedDueDate = dueDate.getTimeInMillis();
+                        updateDueDateLabel();
+                    }
+                },
+                initial.get(Calendar.YEAR),
+                initial.get(Calendar.MONTH),
+                initial.get(Calendar.DAY_OF_MONTH));
+        dialog.show();
+    }
+
+    private void updateDueDateLabel() {
+        if (mSelectedDueDate <= 0) {
+            mDueDate.setText(R.string.todo_no_due_date);
+            return;
+        }
+        SimpleDateFormat formatter = NoteDateUtils.formatter("yyyy-MM-dd");
+        mDueDate.setText(getString(
+                R.string.todo_due_date_format,
+                formatter.format(new Date(mSelectedDueDate))));
     }
 
     /**
@@ -413,11 +525,27 @@ public class NoteEditor extends Activity {
             mIsTodo.setChecked(isTodo);
             mTodoDone.setChecked(todoDone);
             mTodoDone.setVisibility(isTodo ? View.VISIBLE : View.GONE);
+            mTodoSettings.setVisibility(isTodo ? View.VISIBLE : View.GONE);
 
             int colorIndex = NoteColorUtils.normalize(mCursor.getInt(
                     mCursor.getColumnIndexOrThrow(
                             NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR)));
             selectBackgroundColor(colorIndex);
+
+            int priority = mCursor.getInt(mCursor.getColumnIndexOrThrow(
+                    NotePad.Notes.COLUMN_NAME_TODO_PRIORITY));
+            priority = Math.max(0, Math.min(2, priority));
+            mPriority.setSelection(priority);
+
+            mSelectedDueDate = mCursor.getLong(mCursor.getColumnIndexOrThrow(
+                    NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE));
+            updateDueDateLabel();
+
+            int fontStyle = NoteFontUtils.normalize(mCursor.getInt(
+                    mCursor.getColumnIndexOrThrow(
+                            NotePad.Notes.COLUMN_NAME_FONT_STYLE)));
+            mFont.setSelection(fontStyle);
+            NoteFontUtils.apply(mText, fontStyle);
 
             // Stores the original note text, to allow the user to revert changes.
             if (mOriginalContent == null) {
@@ -434,6 +562,12 @@ public class NoteEditor extends Activity {
             if (!mOriginalColorSet) {
                 mOriginalColorIndex = colorIndex;
                 mOriginalColorSet = true;
+            }
+            if (!mOriginalTodoMetaSet) {
+                mOriginalPriority = priority;
+                mOriginalDueDate = mSelectedDueDate;
+                mOriginalFontStyle = fontStyle;
+                mOriginalTodoMetaSet = true;
             }
 
             if (mState == STATE_INSERT) {
@@ -473,6 +607,10 @@ public class NoteEditor extends Activity {
         outState.putBoolean(
                 ORIGINAL_BACKGROUND_COLOR_SET,
                 mOriginalColorSet);
+        outState.putInt(ORIGINAL_TODO_PRIORITY, mOriginalPriority);
+        outState.putLong(ORIGINAL_TODO_DUE_DATE, mOriginalDueDate);
+        outState.putInt(ORIGINAL_FONT_STYLE, mOriginalFontStyle);
+        outState.putBoolean(ORIGINAL_TODO_META_SET, mOriginalTodoMetaSet);
     }
 
     /**
@@ -722,10 +860,21 @@ public class NoteEditor extends Activity {
             values.put(
                     NotePad.Notes.COLUMN_NAME_TODO_DONE,
                     isTodo && mTodoDone.isChecked() ? 1 : 0);
+            values.put(
+                    NotePad.Notes.COLUMN_NAME_TODO_PRIORITY,
+                    isTodo ? mPriority.getSelectedItemPosition() : 0);
+            values.put(
+                    NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE,
+                    isTodo ? mSelectedDueDate : 0);
         }
         values.put(
                 NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR,
                 NoteColorUtils.normalize(mSelectedColorIndex));
+        if (mFont != null) {
+            values.put(
+                    NotePad.Notes.COLUMN_NAME_FONT_STYLE,
+                    NoteFontUtils.normalize(mFont.getSelectedItemPosition()));
+        }
 
         /*
          * Updates the provider with the new values in the map. The ListView is updated
@@ -772,6 +921,15 @@ public class NoteEditor extends Activity {
                 values.put(
                         NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR,
                         NoteColorUtils.normalize(mOriginalColorIndex));
+                values.put(
+                        NotePad.Notes.COLUMN_NAME_TODO_PRIORITY,
+                        mOriginalPriority);
+                values.put(
+                        NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE,
+                        mOriginalDueDate);
+                values.put(
+                        NotePad.Notes.COLUMN_NAME_FONT_STYLE,
+                        NoteFontUtils.normalize(mOriginalFontStyle));
                 getContentResolver().update(mUri, values, null, null);
             } else if (mState == STATE_INSERT) {
                 // We inserted an empty note, make sure to delete it

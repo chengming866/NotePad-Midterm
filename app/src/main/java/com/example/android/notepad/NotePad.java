@@ -164,6 +164,30 @@ public final class NotePad {
         public static final String COLUMN_NAME_BACKGROUND_COLOR = "background_color";
 
         /**
+         * Whether this note is pinned to the top of the list.
+         * <P>Type: INTEGER</P>
+         */
+        public static final String COLUMN_NAME_IS_PINNED = "is_pinned";
+
+        /**
+         * Todo priority: 0 normal, 1 important, 2 urgent.
+         * <P>Type: INTEGER</P>
+         */
+        public static final String COLUMN_NAME_TODO_PRIORITY = "todo_priority";
+
+        /**
+         * Todo due date in milliseconds. 0 means no due date.
+         * <P>Type: INTEGER</P>
+         */
+        public static final String COLUMN_NAME_TODO_DUE_DATE = "todo_due_date";
+
+        /**
+         * Index of the selected note font style.
+         * <P>Type: INTEGER</P>
+         */
+        public static final String COLUMN_NAME_FONT_STYLE = "font_style";
+
+        /**
          * Category used when a note has not been assigned to another category.
          */
         public static final String DEFAULT_CATEGORY = "未分类";

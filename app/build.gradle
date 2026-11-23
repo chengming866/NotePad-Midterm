@@ -5,6 +5,10 @@ android {
     compileSdkVersion 36
     buildToolsVersion "36.0.0"
 
+    useLibrary 'android.test.base'
+    useLibrary 'android.test.mock'
+    useLibrary 'android.test.runner'
+
     defaultConfig {
         applicationId "com.example.android.notepad"
         minSdkVersion 11

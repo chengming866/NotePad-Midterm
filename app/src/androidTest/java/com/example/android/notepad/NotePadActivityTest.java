@@ -17,6 +17,7 @@
 package com.example.android.notepad;
 
 import android.test.ActivityInstrumentationTestCase2;
+import android.view.View;
 import com.example.android.notepad.NotesList;
 
 /**
@@ -36,6 +37,9 @@ public class NotePadActivityTest extends ActivityInstrumentationTestCase2<NotesL
      * Verifies that the activity under test can be launched.
      */
     public void testActivityTestCaseSetUpProperly() {
-        assertNotNull("activity should be launched successfully", getActivity());
+        NotesList activity = getActivity();
+        assertNotNull("activity should be launched successfully", activity);
+        View list = activity.findViewById(android.R.id.list);
+        assertNotNull("note list should be present", list);
     }
 }

@@ -31,8 +31,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
-import java.util.Locale;
+import java.util.List;
 
 /**
  * Shows notes marked as todos. Pending items stay above completed items.
@@ -45,11 +46,15 @@ public class TodoListActivity extends ListActivity {
             NotePad.Notes.COLUMN_NAME_NOTE,
             NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
             NotePad.Notes.COLUMN_NAME_TODO_DONE,
-            NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR
+            NotePad.Notes.COLUMN_NAME_BACKGROUND_COLOR,
+            NotePad.Notes.COLUMN_NAME_TODO_PRIORITY,
+            NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE,
+            NotePad.Notes.COLUMN_NAME_FONT_STYLE
     };
 
     private TodoAdapter mAdapter;
     private TextView mEmptyView;
+    private TextView mSummary;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +62,7 @@ public class TodoListActivity extends ListActivity {
         setContentView(R.layout.todo_list);
 
         mEmptyView = (TextView) findViewById(android.R.id.empty);
+        mSummary = (TextView) findViewById(R.id.todo_summary);
         getListView().setOnCreateContextMenuListener(this);
 
         mAdapter = new TodoAdapter(queryTodos());
@@ -88,6 +94,10 @@ public class TodoListActivity extends ListActivity {
                 NotePad.Notes.COLUMN_NAME_IS_TODO + " = 1",
                 null,
                 NotePad.Notes.COLUMN_NAME_TODO_DONE + " ASC, "
+                        + NotePad.Notes.COLUMN_NAME_TODO_PRIORITY + " DESC, "
+                        + "CASE WHEN " + NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE
+                        + " = 0 THEN 1 ELSE 0 END ASC, "
+                        + NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE + " ASC, "
                         + NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " DESC");
     }
 
@@ -100,6 +110,28 @@ public class TodoListActivity extends ListActivity {
         if (oldCursor != null) {
             oldCursor.close();
         }
+        updateSummary(newCursor);
+    }
+
+    private void updateSummary(Cursor cursor) {
+        int pending = 0;
+        int completed = 0;
+        if (cursor != null) {
+            int doneIndex = cursor.getColumnIndexOrThrow(
+                    NotePad.Notes.COLUMN_NAME_TODO_DONE);
+            while (cursor.moveToNext()) {
+                if (cursor.getInt(doneIndex) == 1) {
+                    completed++;
+                } else {
+                    pending++;
+                }
+            }
+            cursor.moveToPosition(-1);
+        }
+        mSummary.setText(getString(
+                R.string.todo_summary_format,
+                pending,
+                completed));
     }
 
     private void createTodo() {
@@ -244,9 +276,19 @@ public class TodoListActivity extends ListActivity {
             String title = cursor.getString(cursor.getColumnIndexOrThrow(
                     NotePad.Notes.COLUMN_NAME_TITLE));
             TextView titleView = (TextView) view.findViewById(R.id.todo_title);
+            int fontStyle = NoteFontUtils.normalize(cursor.getInt(
+                    cursor.getColumnIndexOrThrow(
+                            NotePad.Notes.COLUMN_NAME_FONT_STYLE)));
+            NoteFontUtils.applyBold(titleView, fontStyle);
             titleView.setText(TextUtils.isEmpty(title)
                     ? getString(R.string.note_untitled)
                     : title);
+            int priority = Math.max(0, Math.min(2, cursor.getInt(
+                    cursor.getColumnIndexOrThrow(
+                            NotePad.Notes.COLUMN_NAME_TODO_PRIORITY))));
+            boolean urgentPending = !completed && priority == 2;
+            titleView.setTextColor(context.getResources().getColor(
+                    urgentPending ? R.color.danger : R.color.text_primary));
             int paintFlags = titleView.getPaintFlags();
             titleView.setPaintFlags(completed
                     ? paintFlags | Paint.STRIKE_THRU_TEXT_FLAG
@@ -258,7 +300,9 @@ public class TodoListActivity extends ListActivity {
             if (preview.length() > 80) {
                 preview = preview.substring(0, 80) + "...";
             }
-            ((TextView) view.findViewById(R.id.todo_preview)).setText(
+            TextView previewView = (TextView) view.findViewById(R.id.todo_preview);
+            NoteFontUtils.apply(previewView, fontStyle);
+            previewView.setText(
                     TextUtils.isEmpty(preview)
                             ? getString(R.string.note_preview_empty)
                             : preview);
@@ -273,21 +317,39 @@ public class TodoListActivity extends ListActivity {
                 }
             });
 
-            long modified = cursor.getLong(cursor.getColumnIndexOrThrow(
-                    NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE));
-            SimpleDateFormat formatter = new SimpleDateFormat(
-                    "yyyy-MM-dd HH:mm",
-                    Locale.getDefault());
+            long dueDate = cursor.getLong(cursor.getColumnIndexOrThrow(
+                    NotePad.Notes.COLUMN_NAME_TODO_DUE_DATE));
+            boolean overdue = !completed
+                    && dueDate > 0
+                    && dueDate < System.currentTimeMillis();
+            SimpleDateFormat formatter = NoteDateUtils.formatter("yyyy-MM-dd");
             String status = getString(completed
                     ? R.string.todo_completed
                     : R.string.todo_pending);
-            String time = getString(
-                    R.string.note_time_format,
-                    formatter.format(new Date(modified)));
-            ((TextView) view.findViewById(R.id.todo_meta)).setText(getString(
-                    R.string.note_meta_format,
-                    status,
-                    time));
+            List<String> meta = new ArrayList<String>();
+            meta.add(status);
+            if (priority > 0) {
+                meta.add(getString(priority == 2
+                        ? R.string.todo_priority_urgent
+                        : R.string.todo_priority_important));
+            }
+            if (dueDate > 0) {
+                String date = formatter.format(new Date(dueDate));
+                meta.add(getString(overdue
+                        ? R.string.todo_overdue_format
+                        : R.string.todo_due_date_format, date));
+            }
+            StringBuilder metaBuilder = new StringBuilder();
+            for (int i = 0; i < meta.size(); i++) {
+                if (i > 0) {
+                    metaBuilder.append(" · ");
+                }
+                metaBuilder.append(meta.get(i));
+            }
+            TextView metaView = (TextView) view.findViewById(R.id.todo_meta);
+            metaView.setText(metaBuilder.toString());
+            metaView.setTextColor(context.getResources().getColor(
+                    overdue ? R.color.danger : R.color.accent));
         }
     }
 }
